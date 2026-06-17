@@ -479,13 +479,87 @@ La validación cruzada de $k$ pliegues divide el conjunto de datos en $k$ subcon
 
 *a) Derive el conjunto completo de reglas de clasificación, recorriendo cada camino desde la raíz hasta una hoja.*
 
+A partir del árbol de decisión, se deriva una regla por cada camino que va desde la raíz hasta una hoja.
+
+**Regla 1:**  
+Si `Ingreso = Alto`, entonces `Otorga = Sí`.
+
+**Regla 2:**  
+Si `Ingreso = Medio` e `Historial = Bueno`, entonces `Otorga = Sí`.
+
+**Regla 3:**  
+Si `Ingreso = Medio` e `Historial = Malo`, entonces `Otorga = No`.
+
+**Regla 4:**  
+Si `Ingreso = Bajo` e `Historial = Malo`, entonces `Otorga = No`.
+
+**Regla 5:**  
+Si `Ingreso = Bajo`, `Historial = Bueno` y `Deuda = Baja`, entonces `Otorga = Sí`.
+
+**Regla 6:**  
+Si `Ingreso = Bajo`, `Historial = Bueno` y `Deuda = Alta`, entonces `Otorga = No`.
+
 *b) Para cada regla, indique su cobertura (la cantidad de instancias del Conjunto de Datos 1 que satisface su antecedente) y su exactitud sobre dichas instancias.*
+La **cobertura** de una regla es la cantidad de instancias del conjunto de datos que cumplen el antecedente de esa regla.
+
+La **exactitud** se calcula como:
+
+\[
+\text{Exactitud} =
+\frac{\text{casos correctamente clasificados por la regla}}
+{\text{casos cubiertos por la regla}}
+\]
+
+```{r tabla-cobertura-exactitud}
+tabla_reglas <- data.frame(
+  Regla = c("R1", "R2", "R3", "R4", "R5", "R6"),
+  Antecedente = c(
+    "Ingreso = Alto",
+    "Ingreso = Medio e Historial = Bueno",
+    "Ingreso = Medio e Historial = Malo",
+    "Ingreso = Bajo e Historial = Malo",
+    "Ingreso = Bajo e Historial = Bueno y Deuda = Baja",
+    "Ingreso = Bajo e Historial = Bueno y Deuda = Alta"
+  ),
+  Cobertura = c(4, 3, 2, 3, 1, 1),
+  Exactitud = c("100%", "100%", "100%", "100%", "100%", "100%")
+)
+
+knitr::kable(
+  tabla_reglas,
+  align = c("l", "l", "c", "c"),
+  caption = "Cobertura y exactitud de las reglas derivadas del árbol de decisión"
+)
+```
 
 *c) ¿El conjunto de reglas resultante es mutuamente excluyente y exhaustivo? Justifique su respuesta.*
 
+Sí. El conjunto de reglas es mutuamente excluyente porque cada instancia satisface una sola regla, dado que cada camino del árbol conduce a una única hoja. Es decir, una misma instancia no puede caer en dos hojas distintas al mismo tiempo.
+
+También es exhaustivo porque las ramas del árbol cubren todos los valores posibles de los atributos considerados. Por lo tanto, toda instancia puede ser clasificada por alguna regla. En este caso, cualquier solicitante con `Ingreso = Alto`, `Ingreso = Medio` o `Ingreso = Bajo` termina en alguna hoja y recibe una clasificación.
+
+
 *d) Clasifique los siguientes solicitantes nuevos: S1 (Ingreso = Medio, Historial = Malo, Deuda = Baja) y S2 (Ingreso = Bajo, Historial = Bueno, Deuda = Alta).*
 
-*(Pendiente.)*
+
+**Solicitante S1:**  
+`Ingreso = Medio`, `Historial = Malo`, `Deuda = Baja`.
+
+Como `Ingreso = Medio` e `Historial = Malo`, se aplica la **Regla 3**. Por lo tanto:
+
+\[
+\text{Otorga} = \text{No}
+\]
+
+**Solicitante S2:**  
+`Ingreso = Bajo`, `Historial = Bueno`, `Deuda = Alta`.
+
+Como `Ingreso = Bajo`, `Historial = Bueno` y `Deuda = Alta`, se aplica la **Regla 6**. Por lo tanto:
+
+\[
+\text{Otorga} = \text{No}
+\]
+
 
 ## Ejercicio 9. Conjunto ordenado de reglas frente a votación
 
