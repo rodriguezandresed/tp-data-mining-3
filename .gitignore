@@ -1,0 +1,22 @@
+# R
+.Rhistory
+.RData
+.Rproj.user/
+*.Rproj
+
+# R Markdown / knitr intermediates
+*.knit.md
+*.utf8.md
+/cache/
+
+# LaTeX auxiliaries
+*.aux
+*.log
+*.out
+*.toc
+*.tex
+*.synctex.gz
+
+# OS
+Thumbs.db
+.DS_Store
