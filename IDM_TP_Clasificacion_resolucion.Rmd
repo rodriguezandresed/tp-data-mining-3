@@ -271,7 +271,7 @@ knitr::kable(gini_t, booktabs = TRUE,
 
 *c) Indique el punto de corte óptimo y exprese la condición de prueba asociada al nodo.*
 
-El punto de corte óptimo es **105**, ya que presenta el menor índice de Gini ponderado (0,32) entre todos los candidatos evaluados. La condición de prueba asociada al nodo es $\text{Ingreso imponible} \leq 105$. Esta condición divide el conjunto de datos en dos subconjuntos: los contribuyentes con ingreso imponible menor o igual a 105 se asignan a la rama izquierda del árbol, mientras que aquellos con ingreso superior a 105 se asignan a la rama derecha.
+El punto de corte óptimo es **87,5**, ya que presenta el menor índice de Gini ponderado (0,2857) entre todos los candidatos evaluados. La condición de prueba asociada al nodo es $\text{Ingreso imponible} \leq 87{,}5$. Esta condición divide el conjunto de datos en dos subconjuntos: los contribuyentes con ingreso imponible menor o igual a 87,5 se asignan a la rama izquierda del árbol (nodo puro de clase "No"), mientras que aquellos con ingreso superior a 87,5 se asignan a la rama derecha.
 
 *d) Explique por qué los árboles de decisión solo generan fronteras de decisión paralelas a los ejes de coordenadas.*
 
@@ -500,6 +500,7 @@ Si `Ingreso = Bajo`, `Historial = Bueno` y `Deuda = Baja`, entonces `Otorga = S�
 Si `Ingreso = Bajo`, `Historial = Bueno` y `Deuda = Alta`, entonces `Otorga = No`.
 
 *b) Para cada regla, indique su cobertura (la cantidad de instancias del Conjunto de Datos 1 que satisface su antecedente) y su exactitud sobre dichas instancias.*
+
 La **cobertura** de una regla es la cantidad de instancias del conjunto de datos que cumplen el antecedente de esa regla.
 
 La **exactitud** se calcula como:
@@ -509,6 +510,8 @@ La **exactitud** se calcula como:
 \frac{\text{casos correctamente clasificados por la regla}}
 {\text{casos cubiertos por la regla}}
 \]
+
+\clearpage
 
 ```{r tabla-cobertura-exactitud}
 tabla_reglas <- data.frame(
@@ -527,10 +530,19 @@ tabla_reglas <- data.frame(
 
 knitr::kable(
   tabla_reglas,
+  booktabs = TRUE,
   align = c("l", "l", "c", "c"),
+  linesep = "",
   caption = "Cobertura y exactitud de las reglas derivadas del árbol de decisión"
-)
+) |>
+  kableExtra::kable_styling(latex_options = "HOLD_position", position = "center") |>
+  kableExtra::column_spec(1, width = "1cm") |>
+  kableExtra::column_spec(2, width = "7cm") |>
+  kableExtra::column_spec(3, width = "2.5cm") |>
+  kableExtra::column_spec(4, width = "2.5cm")
 ```
+
+*Nota.* Elaboración propia a partir del árbol de decisión del Ejercicio 2.
 
 *c) ¿El conjunto de reglas resultante es mutuamente excluyente y exhaustivo? Justifique su respuesta.*
 
