@@ -747,50 +747,294 @@ El **clasificador basado en reglas** es preferible cuando distintos subconjuntos
 
 *Esta parte se resuelve en R. Se utilizará el conjunto de datos PimaIndiansDiabetes del paquete mlbench (768 observaciones; ocho atributos predictores numéricos y el atributo de clase diabetes, con valores pos y neg). El siguiente fragmento prepara el entorno de trabajo:*
 
-```r
-pkgs <- c("rpart", "rpart.plot", "caret", "C50", "mlbench")
-install.packages(pkgs[!(pkgs %in% installed.packages()[, "Package"])])
+```{r f-setup-show, echo=TRUE, message=FALSE, warning=FALSE}
+pkgs <- c("rpart", "rpart.plot", "caret", "C50", "mlbench", "RWeka", "ggplot2")
+faltan <- pkgs[!(pkgs %in% installed.packages()[, "Package"])]
+if (length(faltan)) install.packages(faltan, repos = "https://cloud.r-project.org")
+
+# El algoritmo PART (Ejercicio 13 d) usa RWeka, que requiere un JDK accesible vía rJava.
+# En macOS se resuelve JAVA_HOME de forma automática; en otros sistemas se respeta el definido.
+if (Sys.getenv("JAVA_HOME") == "" && file.exists("/usr/libexec/java_home")) {
+  jh <- tryCatch(system("/usr/libexec/java_home", intern = TRUE), error = function(e) "")
+  if (length(jh) && nzchar(jh)) Sys.setenv(JAVA_HOME = jh)
+}
+
 library(rpart); library(rpart.plot); library(caret)
-library(C50); library(mlbench)
+library(C50); library(mlbench); library(RWeka); library(ggplot2)
 data(PimaIndiansDiabetes, package = "mlbench")
 set.seed(2026)
+df <- PimaIndiansDiabetes
 ```
+
+```{r f-helpers, echo=FALSE}
+r3 <- function(x) formatC(as.numeric(x), format = "f", digits = 3)
+pp <- function(x) formatC(100 * as.numeric(x), format = "f", digits = 1)
+n_hojas <- function(m) sum(m$frame$var == "<leaf>")
+n_reglas <- function(m) {
+  ln <- grep("Number of Rules", capture.output(print(m)), value = TRUE)
+  if (length(ln) == 0) return(NA_integer_)
+  as.integer(gsub("\\D", "", ln[1]))
+}
+metrics_test <- function(pred) {
+  cm <- confusionMatrix(pred, test$diabetes, positive = "pos")
+  c(Exactitud     = unname(cm$overall["Accuracy"]),
+    Sensibilidad  = unname(cm$byClass["Sensitivity"]),
+    Especificidad = unname(cm$byClass["Specificity"]),
+    Kappa         = unname(cm$overall["Kappa"]))
+}
+```
+
+El conjunto registra 768 observaciones de mujeres de la etnia Pima, descriptas por ocho atributos predictores numéricos (número de embarazos, glucosa, presión arterial, pliegue cutáneo del tríceps, insulina, índice de masa corporal, función de pedigrí diabético y edad) y el atributo de clase `diabetes`, con niveles `neg` y `pos`. La clase está moderadamente desbalanceada: solo el `r pp(mean(df$diabetes == "pos"))` % de los casos corresponde a la clase positiva. Por ese motivo la evaluación no se apoya solo en la exactitud; también se reportan la sensibilidad, la especificidad y el estadístico Kappa, menos sensibles al desbalance.
+
+```{r f-clase, echo=FALSE}
+tab  <- table(df$diabetes)
+prop <- prop.table(tab)
+knitr::kable(
+  data.frame(Clase = names(tab), Frecuencia = as.integer(tab),
+             Proporción = paste0(formatC(100 * as.numeric(prop), format = "f", digits = 1), " %")),
+  booktabs = TRUE, linesep = "", align = c("l", "c", "c"),
+  caption = "Distribución de la clase en PimaIndiansDiabetes") |>
+  kableExtra::kable_styling(latex_options = "HOLD_position", position = "center")
+```
+
+*Nota.* Elaboración propia a partir del paquete `mlbench`.
 
 ## Ejercicio 11. Árboles de decisión con rpart
 
 *a) Cargue los datos y particiónelos en un 70 % de entrenamiento y un 30 % de prueba mediante caret::createDataPartition. Fije la semilla del generador de números aleatorios para garantizar la reproducibilidad.*
 
+```{r f-ej11-particion, echo=TRUE}
+set.seed(2026)
+idx   <- createDataPartition(df$diabetes, p = 0.70, list = FALSE)
+train <- df[idx, ]
+test  <- df[-idx, ]
+c(entrenamiento = nrow(train), prueba = nrow(test))
+```
+
+La función `caret::createDataPartition` realiza un muestreo estratificado por la variable de clase, de modo que conserva en cada subconjunto la proporción original de `pos` y `neg`. La estratificación es deseable en un problema desbalanceado, porque evita que el azar deje al conjunto de prueba con muy pocos positivos. La semilla se fija con `set.seed(2026)` inmediatamente antes de la partición.
+
 *b) Induzca un árbol de decisión sobre el conjunto de entrenamiento con la función rpart() y visualícelo con rpart.plot().*
+
+```{r f-ej11-arbol, echo=TRUE, fig.cap="Árbol de decisión por defecto inducido con rpart (cp = 0.01).", out.width="80%"}
+set.seed(2026)
+tree_def <- rpart(diabetes ~ ., data = train, method = "class")
+rpart.plot(tree_def, type = 2, extra = 104, fallen.leaves = TRUE, box.palette = "BuGn")
+```
+
+El árbol se induce con los hiperparámetros por defecto de `rpart`, entre ellos el parámetro de complejidad `cp = 0.01`, que opera como criterio de prepoda: solo admite particiones que reduzcan el error relativo en al menos un uno por ciento. El árbol resultante tiene `r n_hojas(tree_def)` nodos hoja. La glucosa es el atributo seleccionado en la raíz, hecho coherente con el dominio clínico, donde constituye el predictor más informativo de la diabetes.
 
 *c) Calcule el error de resustitución (sobre el conjunto de entrenamiento) y el error de generalización (sobre el conjunto de prueba) mediante caret::confusionMatrix(). Compare ambos valores y comente.*
 
+```{r f-ej11-errores, echo=TRUE}
+pred_train <- predict(tree_def, train, type = "class")
+pred_test  <- predict(tree_def, test,  type = "class")
+cm_train <- confusionMatrix(pred_train, train$diabetes, positive = "pos")
+cm_test  <- confusionMatrix(pred_test,  test$diabetes,  positive = "pos")
+acc_train <- cm_train$overall["Accuracy"]
+acc_test  <- cm_test$overall["Accuracy"]
+```
+
+```{r f-ej11-tab-errores, echo=FALSE}
+knitr::kable(
+  data.frame(
+    Conjunto = c("Entrenamiento (resustitución)", "Prueba (generalización)"),
+    Exactitud = c(acc_train, acc_test),
+    `Tasa de error` = c(1 - acc_train, 1 - acc_test),
+    check.names = FALSE),
+  booktabs = TRUE, digits = 4, linesep = "", align = c("l", "c", "c"),
+  caption = "Error de resustitución frente a error de generalización (árbol por defecto)") |>
+  kableExtra::kable_styling(latex_options = "HOLD_position", position = "center")
+```
+
+*Nota.* Elaboración propia a partir del árbol inducido con `rpart`.
+
+El error de resustitución es de `r pp(1 - acc_train)` % y el error de generalización sube a `r pp(1 - acc_test)` %. La diferencia entre ambos refleja el optimismo del error de entrenamiento: el modelo se ajusta en parte a las particularidades de la muestra de entrenamiento. La indicación `positive = "pos"` es deliberada, porque por defecto `confusionMatrix` toma como clase positiva el primer nivel del factor (`neg`); dado que el objetivo clínico es la detección de diabetes, la clase de interés debe ser `pos`.
+
 *d) Informe la exactitud, la sensibilidad, la especificidad y el estadístico Kappa obtenidos sobre el conjunto de prueba.*
 
-*(Pendiente.)*
+```{r f-ej11-metricas, echo=FALSE}
+knitr::kable(
+  data.frame(
+    Métrica = c("Exactitud", "Sensibilidad", "Especificidad", "Kappa de Cohen"),
+    Valor = c(cm_test$overall["Accuracy"], cm_test$byClass["Sensitivity"],
+              cm_test$byClass["Specificity"], cm_test$overall["Kappa"])),
+  booktabs = TRUE, digits = 4, linesep = "", align = c("l", "c"),
+  caption = "Métricas de desempeño sobre el conjunto de prueba (árbol por defecto)") |>
+  kableExtra::kable_styling(latex_options = "HOLD_position", position = "center")
+```
+
+*Nota.* La clase positiva es `pos` (paciente diabética).
+
+Sobre el conjunto de prueba el árbol alcanza una exactitud de `r pp(cm_test$overall["Accuracy"])` % y un Kappa de `r r3(cm_test$overall["Kappa"])`, indicador de una concordancia moderada por encima del azar. La sensibilidad es de apenas `r pp(cm_test$byClass["Sensitivity"])` % frente a una especificidad de `r pp(cm_test$byClass["Specificity"])` %: el modelo detecta bien a las pacientes sanas, pero no identifica a buena parte de las diabéticas reales (falsos negativos). Ese desbalance entre sensibilidad y especificidad es el costo que el árbol por defecto asume para maximizar la exactitud global, y la sensibilidad es la métrica más relevante en un tamiz clínico.
 
 ## Ejercicio 12. Sobreajuste y poda en R
 
 *a) Induzca un árbol «completo» fijando los hiperparámetros rpart.control(minsplit = 2, cp = 0) y compare su error de resustitución con su error de generalización. ¿Qué evidencia de sobreajuste observa?*
 
+```{r f-ej12-completo, echo=TRUE}
+set.seed(2026)
+tree_full <- rpart(diabetes ~ ., data = train, method = "class",
+                   control = rpart.control(minsplit = 2, cp = 0))
+pred_full_train <- predict(tree_full, train, type = "class")
+pred_full_test  <- predict(tree_full, test,  type = "class")
+acc_full_train <- confusionMatrix(pred_full_train, train$diabetes, positive = "pos")$overall["Accuracy"]
+acc_full_test  <- confusionMatrix(pred_full_test,  test$diabetes,  positive = "pos")$overall["Accuracy"]
+n_hojas_full   <- n_hojas(tree_full)
+```
+
+```{r f-ej12-tab-completo, echo=FALSE}
+knitr::kable(
+  data.frame(
+    Conjunto = c("Entrenamiento (resustitución)", "Prueba (generalización)"),
+    Exactitud = c(acc_full_train, acc_full_test),
+    `Tasa de error` = c(1 - acc_full_train, 1 - acc_full_test),
+    check.names = FALSE),
+  booktabs = TRUE, digits = 4, linesep = "", align = c("l", "c", "c"),
+  caption = "Árbol completo (minsplit = 2, cp = 0): resustitución casi perfecta y mala generalización") |>
+  kableExtra::kable_styling(latex_options = "HOLD_position", position = "center")
+```
+
+*Nota.* Elaboración propia.
+
+Al fijar `minsplit = 2` y `cp = 0` se desactiva toda la prepoda y el árbol crece hasta el límite, con `r n_hojas_full` nodos hoja. La evidencia de sobreajuste es contundente: el error de resustitución cae a `r pp(1 - acc_full_train)` %, casi una memorización del entrenamiento, pero el error de prueba empeora a `r pp(1 - acc_full_test)` %, peor incluso que el del árbol por defecto del Ejercicio 11 (`r pp(1 - acc_test)` %). El crecimiento sin restricción no mejora la generalización: la degrada, porque el árbol modela ruido en lugar de señal.
+
+```{r f-ej12-plot-completo, echo=TRUE, fig.cap="Árbol completo: su tamaño excesivo lo vuelve ilegible, y esa misma complejidad es la causa del sobreajuste.", out.width="95%"}
+rpart.plot(tree_full, type = 0, extra = 0, tweak = 0.9, box.palette = 0)
+```
+
 *b) Utilice caret::train() con validación cruzada de 10 pliegues para seleccionar el valor óptimo del parámetro de complejidad cp.*
+
+```{r f-ej12-cv, echo=TRUE}
+set.seed(2026)
+ctrl <- trainControl(method = "cv", number = 10)
+grid <- expand.grid(cp = seq(0, 0.05, by = 0.002))
+fit_cv <- train(diabetes ~ ., data = train, method = "rpart",
+                trControl = ctrl, tuneGrid = grid)
+cp_opt <- fit_cv$bestTune$cp
+cp_opt
+```
+
+La función `caret::train` reentrena el árbol para cada valor de `cp` de la grilla y estima su desempeño por validación cruzada de 10 pliegues: divide el entrenamiento en diez partes, entrena con nueve y evalúa en la restante, con rotación. El error medio sobre los diez pliegues es un estimador del error de generalización más estable que el de una única partición. El valor seleccionado, de máxima exactitud media, es `cp` = `r cp_opt`.
 
 *c) Genere la curva del error estimado por validación cruzada en función de cp e interprétela.*
 
+```{r f-ej12-curva, echo=TRUE, fig.cap="Error de clasificación estimado por validación cruzada (10 pliegues) en función de cp; el punto rojo marca el cp óptimo.", out.width="80%"}
+res <- fit_cv$results
+res$error_cv <- 1 - res$Accuracy
+ggplot(res, aes(x = cp, y = error_cv)) +
+  geom_line(color = "steelblue") +
+  geom_point(color = "steelblue") +
+  geom_point(data = res[res$cp == cp_opt, ], color = "red", size = 3) +
+  geom_vline(xintercept = cp_opt, linetype = "dashed", color = "red") +
+  labs(x = "Parámetro de complejidad (cp)",
+       y = "Error de clasificación (validación cruzada)") +
+  theme_minimal(base_size = 12)
+```
+
+La curva adopta la forma característica del compromiso entre sesgo y varianza. Con `cp` próximo a cero el árbol es demasiado complejo, sobreajusta y el error de validación cruzada es alto. A medida que `cp` aumenta, la poda elimina ramas espurias y el error desciende hasta un mínimo en `cp` = `r cp_opt`. Pasado ese punto, un `cp` demasiado grande poda en exceso (subajuste) y el error vuelve a subir. El mínimo de la curva identifica la complejidad que mejor generaliza.
+
 *d) Compare el desempeño del árbol completo, el árbol por defecto y el árbol podado sobre el conjunto de prueba. Extraiga una conclusión.*
 
-*(Pendiente.)*
+```{r f-ej12-comp, echo=TRUE}
+tree_pruned    <- prune(tree_full, cp = ifelse(cp_opt == 0, 1e-6, cp_opt))
+n_hojas_pruned <- n_hojas(tree_pruned)
+arboles <- list(`Árbol completo (cp = 0)`      = tree_full,
+                `Árbol por defecto (cp = 0.01)` = tree_def,
+                `Árbol podado (cp óptimo)`      = tree_pruned)
+comp <- data.frame(
+  Modelo = names(arboles),
+  Hojas  = sapply(arboles, n_hojas),
+  t(sapply(arboles, function(m) metrics_test(predict(m, test, type = "class")))),
+  row.names = NULL, check.names = FALSE)
+```
+
+```{r f-ej12-tab-comp, echo=FALSE}
+knitr::kable(comp, booktabs = TRUE, digits = 4, linesep = "",
+  align = c("l", "c", "c", "c", "c", "c"),
+  caption = "Desempeño sobre el conjunto de prueba de los tres árboles") |>
+  kableExtra::kable_styling(latex_options = "HOLD_position", position = "center", font_size = 9)
+```
+
+*Nota.* Elaboración propia.
+
+El árbol podado tiene `r n_hojas_pruned` hojas, frente a las `r n_hojas_full` del completo, y es el que mejor generaliza de los tres, con la mayor exactitud y el mayor Kappa sobre prueba. La conclusión es directa: más complejidad no implica mejor desempeño. El árbol completo sobreajusta, el árbol por defecto aplica ya una prepoda razonable y la poda guiada por validación cruzada encuentra el punto de complejidad que minimiza el error de generalización estimado. El procedimiento recomendado consiste en dejar crecer el árbol y luego podarlo con un `cp` elegido por validación cruzada.
 
 ## Ejercicio 13. Clasificador basado en reglas en R
 
 *a) Induzca un clasificador basado en reglas con el algoritmo C5.0 (paquete C50), con la opción rules = TRUE, sobre el mismo conjunto de entrenamiento del Ejercicio 11.*
 
+```{r f-ej13-c50, echo=TRUE}
+set.seed(2026)
+c5_rules <- C5.0(x = train[, setdiff(names(train), "diabetes")],
+                 y = train$diabetes, rules = TRUE)
+c5_rules
+```
+
+Con `rules = TRUE`, C5.0 primero induce un árbol y luego lo convierte en un conjunto de reglas que después simplifica, con poda de condiciones redundantes y eliminación de reglas que no aportan. El modelo resultante contiene `r n_reglas(c5_rules)` reglas.
+
 *b) Inspeccione el conjunto de reglas generado con summary() e interprete dos de las reglas obtenidas.*
+
+```{r f-ej13-summary, echo=TRUE}
+summary(c5_rules)
+```
+
+Cada regla se reporta como `(n/m, lift L)`, donde `n` es la cobertura (instancias de entrenamiento que satisfacen el antecedente), `m` los errores dentro de esa cobertura y `lift` la mejora respecto de la probabilidad base de la clase. Se interpretan dos reglas representativas:
+
+- Regla de alta precisión y baja cobertura (Regla 1): `glucose <= 127` junto con `mass <= 26.9` conducen a la clase `neg`. Cubre 89 pacientes de entrenamiento con un solo error (confianza cercana a 0.98, lift 1.5). Tiene sentido clínico, ya que una glucosa no elevada junto con un bajo índice de masa corporal son indicadores fuertes de ausencia de diabetes. Es una regla muy confiable, aunque específica.
+- Regla de alta cobertura y baja precisión (Regla 8): `pregnant <= 6` conduce a la clase `neg`. Cubre 418 casos con 119 errores (confianza cercana a 0.71, lift 1.1). Es casi una regla por defecto, ya que apenas mejora sobre la predicción de la clase mayoritaria. El contraste entre ambas reglas ilustra la diferencia entre reglas específicas y confiables frente a reglas generales y débiles.
+
+El bloque `Attribute usage` de la salida indica el porcentaje de casos cuya clasificación recurre a cada atributo: encabezan la lista `age` (cerca del 93 %), `glucose` (cerca del 78 %) y `pregnant` (cerca del 78 %), seguidos de `mass` y `pedigree`, lo que confirma su relevancia.
 
 *c) Evalúe el clasificador de reglas sobre el conjunto de prueba y compare su desempeño con el del árbol de decisión del Ejercicio 11.*
 
+```{r f-ej13-eval, echo=TRUE}
+pred_c5 <- predict(c5_rules, test)
+cm_c5   <- confusionMatrix(pred_c5, test$diabetes, positive = "pos")
+comp_c5 <- rbind(
+  `Árbol rpart (Ej. 11)` = metrics_test(pred_test),
+  `Reglas C5.0 (Ej. 13)` = metrics_test(pred_c5))
+```
+
+```{r f-ej13-tab-c50, echo=FALSE}
+knitr::kable(comp_c5, booktabs = TRUE, digits = 4, linesep = "",
+  align = c("c", "c", "c", "c"),
+  caption = "Reglas C5.0 frente al árbol rpart sobre el conjunto de prueba") |>
+  kableExtra::kable_styling(latex_options = "HOLD_position", position = "center")
+```
+
+*Nota.* Elaboración propia. La clase positiva es `pos`.
+
+El clasificador de reglas C5.0 supera al árbol `rpart` del Ejercicio 11 en todas las métricas sobre prueba: exactitud `r pp(cm_c5$overall["Accuracy"])` % frente a `r pp(cm_test$overall["Accuracy"])` %, Kappa `r r3(cm_c5$overall["Kappa"])` frente a `r r3(cm_test$overall["Kappa"])` y sensibilidad `r pp(cm_c5$byClass["Sensitivity"])` % frente a `r pp(cm_test$byClass["Sensitivity"])` %. La mejora en sensibilidad es la más valiosa en este problema, porque implica la detección de más diabéticas reales. C5.0 obtiene ese resultado por su poda basada en confianza y por la simplificación del conjunto de reglas, que produce un modelo a la vez compacto y más preciso.
+
 *d) Discuta las diferencias de interpretabilidad entre el árbol de decisión y el conjunto de reglas. Como alternativa, puede emplearse el método "PART" mediante caret::train() con el paquete RWeka.*
 
-*(Pendiente.)*
+```{r f-ej13-part, echo=TRUE}
+set.seed(2026)
+part_fit  <- PART(diabetes ~ ., data = train)
+pred_part <- predict(part_fit, test)
+cm_part   <- confusionMatrix(pred_part, test$diabetes, positive = "pos")
+```
+
+```{r f-ej13-tab-final, echo=FALSE}
+tabla_final <- rbind(
+  `Árbol completo (cp = 0)`    = metrics_test(pred_full_test),
+  `Árbol por defecto (Ej. 11)` = metrics_test(pred_test),
+  `Árbol podado CV (Ej. 12)`   = metrics_test(predict(tree_pruned, test, type = "class")),
+  `Reglas C5.0 (Ej. 13)`       = metrics_test(pred_c5),
+  `Reglas PART (Ej. 13 d)`     = metrics_test(pred_part))
+knitr::kable(tabla_final, booktabs = TRUE, digits = 4, linesep = "",
+  align = c("c", "c", "c", "c"),
+  caption = "Síntesis comparativa de todos los modelos sobre el conjunto de prueba") |>
+  kableExtra::kable_styling(latex_options = "HOLD_position", position = "center")
+```
+
+*Nota.* Elaboración propia. La clase positiva es `pos`.
+
+El enunciado sugiere acceder a PART mediante `caret::train(method = "PART")`. Aquí se emplea la interfaz directa `RWeka::PART()`, equivalente y más transparente, dado que evita la capa de ajuste de hiperparámetros y de remuestreo que añade `caret`; de ese modo el modelo evaluado corresponde a PART con sus parámetros por defecto.
+
+Un árbol de decisión expresa el conocimiento como una jerarquía única: la clasificación de una instancia recorre un solo camino de la raíz a una hoja, y las particiones son mutuamente excluyentes. Un conjunto de reglas (C5.0 o PART) expresa el conocimiento como una lista de reglas independientes del tipo «si... entonces clase». Cada regla es una afirmación autocontenida, fácil de validar con un experto del dominio, y el conjunto admite la incorporación o la eliminación de reglas sin reentrenar todo el modelo. La contrapartida es que un conjunto de reglas puede resultar redundante o ambiguo, porque varias reglas pueden cubrir una misma instancia y entrar en conflicto, lo que exige un mecanismo de resolución de conflictos (orden de prioridad o votación); el árbol evita esa ambigüedad por construcción, a costa de que las ramas profundas se vuelvan difíciles de leer.
+
+En cuanto al desempeño sobre este conjunto, PART obtiene una exactitud de `r pp(cm_part$overall["Accuracy"])` % y un Kappa de `r r3(cm_part$overall["Kappa"])`, por debajo de C5.0. PART genera un conjunto más compacto (`r n_reglas(part_fit)` reglas frente a las `r n_reglas(c5_rules)` de C5.0), pero esa menor cantidad de reglas no se traduce en mejor generalización: el tamaño del modelo, por sí solo, no determina su calidad. En síntesis, C5.0 con reglas es el mejor clasificador de los evaluados, dado que combina el desempeño más alto con una representación interpretable.
 
 \newpage
 
