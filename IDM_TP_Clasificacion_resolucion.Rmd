@@ -221,8 +221,8 @@ Los puntos de corte candidatos se determinaron a partir del punto medio entre ca
 
 ```{r tabla-cortes}
 cortes_a <- data.frame(
-  Intervalos    = c("60 – 70","70 – 80","80 – 95","95 – 100","100 – 110",
-                    "110 – 115","115 – 120","120 – 130","130 – 140"),
+  Intervalos    = c("60 a 70","70 a 80","80 a 95","95 a 100","100 a 110",
+                    "110 a 115","115 a 120","120 a 130","130 a 140"),
   `Punto medio` = c("65","75","87,5","97,5","105","112,5","117,5","125","135"),
   check.names = FALSE
 )
@@ -657,7 +657,7 @@ No quedan positivos sin cubrir. El algoritmo concluye. El conjunto de reglas res
 
 *c) Indique cuántas reglas fueron necesarias y discuta qué consecuencias tendría permitir reglas con una cobertura muy baja.*
 
-La construcción requirió **dos reglas**. Si se permitieran reglas con cobertura muy baja (por ejemplo, una sola instancia por regla), el algoritmo podría generar tantas reglas como instancias positivas existan, memorizando el conjunto de entrenamiento en lugar de capturar los patrones subyacentes. Este fenómeno se conoce como sobreajuste (*overfitting*): el clasificador resultante tendría buen desempeño sobre los datos de entrenamiento pero escasa capacidad de generalización frente a instancias nuevas. Además, un número elevado de reglas excesivamente específicas reduce la interpretabilidad del modelo y dificulta su mantenimiento.
+La construcción requirió **dos reglas**. Si se permitieran reglas con cobertura muy baja (por ejemplo, una sola instancia por regla), el algoritmo podría generar tantas reglas como instancias positivas existan, con lo que memorizaría el conjunto de entrenamiento en lugar de capturar los patrones subyacentes. Este fenómeno se conoce como sobreajuste (*overfitting*): el clasificador resultante tendría buen desempeño sobre los datos de entrenamiento pero escasa capacidad de generalización frente a instancias nuevas. Además, un número elevado de reglas excesivamente específicas reduce la interpretabilidad del modelo y dificulta su mantenimiento.
 
 \newpage
 
@@ -693,7 +693,7 @@ La ganancia de información tiende a favorecer atributos con muchos valores dist
 
 Los árboles de decisión presentan las siguientes ventajas principales:
 
-- **Interpretabilidad:** la estructura del árbol se traduce directamente en reglas SI–ENTONCES legibles sin necesidad de formación técnica especializada.
+- **Interpretabilidad:** la estructura del árbol se traduce directamente en reglas de tipo «si... entonces» legibles sin necesidad de formación técnica especializada.
 - **Ausencia de requisitos de preprocesamiento:** no requieren normalización ni estandarización de atributos y admiten de forma nativa tanto variables categóricas como continuas.
 - **Robustez frente a atributos irrelevantes:** los atributos que no aportan ganancia de información no son seleccionados para ninguna partición y no afectan el modelo.
 
