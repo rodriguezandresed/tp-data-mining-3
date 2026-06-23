@@ -38,6 +38,8 @@ header-includes:
   - \usepackage{etoolbox}
   - \pretocmd{\tableofcontents}{\clearpage}{}{}
   - \apptocmd{\tableofcontents}{\clearpage}{}{}
+  - \usepackage{fvextra}
+  - \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,breakanywhere,commandchars=\\\{\}}
 ---
 
 ```{r setup, include=FALSE}
@@ -747,7 +749,7 @@ El **clasificador basado en reglas** es preferible cuando distintos subconjuntos
 
 *Esta parte se resuelve en R. Se utilizará el conjunto de datos PimaIndiansDiabetes del paquete mlbench (768 observaciones; ocho atributos predictores numéricos y el atributo de clase diabetes, con valores pos y neg). El siguiente fragmento prepara el entorno de trabajo:*
 
-```{r f-setup-show, echo=TRUE, message=FALSE, warning=FALSE}
+```{r f-setup-show, echo=TRUE, message=FALSE, warning=FALSE, results='hide'}
 pkgs <- c("rpart", "rpart.plot", "caret", "C50", "mlbench", "RWeka", "ggplot2")
 faltan <- pkgs[!(pkgs %in% installed.packages()[, "Package"])]
 if (length(faltan)) install.packages(faltan, repos = "https://cloud.r-project.org")
@@ -877,8 +879,10 @@ tree_full <- rpart(diabetes ~ ., data = train, method = "class",
                    control = rpart.control(minsplit = 2, cp = 0))
 pred_full_train <- predict(tree_full, train, type = "class")
 pred_full_test  <- predict(tree_full, test,  type = "class")
-acc_full_train <- confusionMatrix(pred_full_train, train$diabetes, positive = "pos")$overall["Accuracy"]
-acc_full_test  <- confusionMatrix(pred_full_test,  test$diabetes,  positive = "pos")$overall["Accuracy"]
+acc_full_train <- confusionMatrix(pred_full_train, train$diabetes,
+                                  positive = "pos")$overall["Accuracy"]
+acc_full_test  <- confusionMatrix(pred_full_test, test$diabetes,
+                                  positive = "pos")$overall["Accuracy"]
 n_hojas_full   <- n_hojas(tree_full)
 ```
 
