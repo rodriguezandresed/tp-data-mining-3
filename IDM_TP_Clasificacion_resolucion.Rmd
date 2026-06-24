@@ -992,11 +992,33 @@ El bloque `Attribute usage` de la salida indica el porcentaje de casos cuya clas
 *c) Evalúe el clasificador de reglas sobre el conjunto de prueba y compare su desempeño con el del árbol de decisión del Ejercicio 11.*
 
 ```{r f-ej13-eval, echo=TRUE}
+set.seed(2026)
+
+c5_rules <- C5.0(
+  diabetes ~ ., 
+  data = train, 
+  rules = TRUE
+)
+
+summary(c5_rules)
+
+metrics_test <- function(predicciones) {
+  cm <- confusionMatrix(predicciones, test$diabetes, positive = "pos")
+  
+  c(
+    Accuracy = cm$overall["Accuracy"],
+    Sensitivity = cm$byClass["Sensitivity"],
+    Specificity = cm$byClass["Specificity"],
+    Kappa = cm$overall["Kappa"]
+  )
+}
 pred_c5 <- predict(c5_rules, test)
 cm_c5   <- confusionMatrix(pred_c5, test$diabetes, positive = "pos")
 comp_c5 <- rbind(
   `Árbol rpart (Ej. 11)` = metrics_test(pred_test),
   `Reglas C5.0 (Ej. 13)` = metrics_test(pred_c5))
+
+round(comp_c5, 4)
 ```
 
 ```{r f-ej13-tab-c50, echo=FALSE}
