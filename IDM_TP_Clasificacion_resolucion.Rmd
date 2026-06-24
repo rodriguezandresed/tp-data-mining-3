@@ -959,7 +959,7 @@ comp <- data.frame(
 knitr::kable(comp, booktabs = TRUE, digits = 4, linesep = "",
   align = c("l", "c", "c", "c", "c", "c"),
   caption = "Desempeño sobre el conjunto de prueba de los tres árboles") |>
-  kableExtra::kable_styling(latex_options = "HOLD_position", position = "center", font_size = 9)
+  kableExtra::kable_styling(latex_options = "HOLD_position", position = "center", font_size = 11)
 ```
 
 *Nota.* Elaboración propia.
@@ -1027,8 +1027,10 @@ round(comp_c5, 4)
 ```{r f-ej13-tab-c50, echo=FALSE}
 knitr::kable(comp_c5, booktabs = TRUE, digits = 4, linesep = "",
   align = c("c", "c", "c", "c"),
+  col.names = c("Exactitud", "Sensibilidad", "Especificidad", "Kappa"),
   caption = "Reglas C5.0 frente al árbol rpart sobre el conjunto de prueba") |>
-  kableExtra::kable_styling(latex_options = "HOLD_position", position = "center")
+  kableExtra::kable_styling(latex_options = "HOLD_position", position = "center", font_size = 11) |>
+  kableExtra::column_spec(1, width = "3.8cm")
 ```
 
 *Nota.* Elaboración propia. La clase positiva es `pos`.
@@ -1053,8 +1055,10 @@ tabla_final <- rbind(
   `Reglas PART (Ej. 13 d)`     = metrics_test(pred_part))
 knitr::kable(tabla_final, booktabs = TRUE, digits = 4, linesep = "",
   align = c("c", "c", "c", "c"),
+  col.names = c("Exactitud", "Sensibilidad", "Especificidad", "Kappa"),
   caption = "Síntesis comparativa de todos los modelos sobre el conjunto de prueba") |>
-  kableExtra::kable_styling(latex_options = "HOLD_position", position = "center")
+  kableExtra::kable_styling(latex_options = "HOLD_position", position = "center", font_size = 11) |>
+  kableExtra::column_spec(1, width = "4cm")
 ```
 
 *Nota.* Elaboración propia. La clase positiva es `pos`.
