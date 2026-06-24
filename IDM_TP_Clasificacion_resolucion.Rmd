@@ -874,6 +874,9 @@ Sobre el conjunto de prueba el árbol alcanza una exactitud de `r pp(cm_test$ove
 *a) Induzca un árbol «completo» fijando los hiperparámetros rpart.control(minsplit = 2, cp = 0) y compare su error de resustitución con su error de generalización. ¿Qué evidencia de sobreajuste observa?*
 
 ```{r f-ej12-completo, echo=TRUE}
+n_hojas <- function(modelo) {
+  sum(modelo$frame$var == "<leaf>")
+}
 set.seed(2026)
 tree_full <- rpart(diabetes ~ ., data = train, method = "class",
                    control = rpart.control(minsplit = 2, cp = 0))
